@@ -6,6 +6,7 @@ import android.media.MediaPlayer;
 import android.os.Bundle;
 import android.os.Handler;
 import android.support.design.widget.Snackbar;
+import android.support.v4.widget.SwipeRefreshLayout;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.util.AttributeSet;
@@ -33,13 +34,14 @@ import todaytelawat.techandmore.com.todaytelawat.api_container.EntriesItem;
 import todaytelawat.techandmore.com.todaytelawat.api_container.ResponseContainer;
 import todaytelawat.techandmore.com.todaytelawat.bodies.TelawatBody;
 
-public class MainActivity extends AppCompatActivity {
+public class MainActivity extends AppCompatActivity implements SwipeRefreshLayout.OnRefreshListener {
 
-    private static final int HOLDER_KEY = R.id.all;
     private static final int ITEM_KEY = R.id.ifRoom;
     AlertDialog.Builder builder;
     private View view;
+    private SwipeRefreshLayout swipeRefreshLayout;
     private LinearLayout telawatList;
+    MediaPlayer currentMp = null;
 
     LayoutInflater inflater;
     private int mediaFileLengthInMilliseconds;
@@ -63,6 +65,10 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+
+        swipeRefreshLayout = findViewById(R.id.swipeRefresh);
+
+        swipeRefreshLayout.setOnRefreshListener(this);
 
         builder = new AlertDialog.Builder(MainActivity.this);
 
@@ -181,7 +187,10 @@ public class MainActivity extends AppCompatActivity {
 
             MediaPlayer mp = new MediaPlayer();
 
+            if(currentMp != null)
+                currentMp.pause();
 
+            currentMp = mp;
 
             mediaController.setVisibility(View.VISIBLE);
 
@@ -276,6 +285,18 @@ public class MainActivity extends AppCompatActivity {
             };
             handler.postDelayed(notification, 1000);
         }
+    }
+
+
+    @Override
+    public void onRefresh() {
+        if(currentMp != null)
+            currentMp.stop();
+        telawatList.removeAllViews();
+
+        Handler handler = new Handler(getMainLooper());
+        handler.postDelayed(() -> swipeRefreshLayout.setRefreshing(false), 500);
+        loadTelawat();
     }
 
 
