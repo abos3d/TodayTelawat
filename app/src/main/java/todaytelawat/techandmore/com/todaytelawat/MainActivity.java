@@ -1,8 +1,11 @@
 package todaytelawat.techandmore.com.todaytelawat;
 
+import android.app.DownloadManager;
 import android.content.Context;
+import android.content.Intent;
 import android.media.AudioManager;
 import android.media.MediaPlayer;
+import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.support.design.widget.Snackbar;
@@ -37,11 +40,13 @@ import todaytelawat.techandmore.com.todaytelawat.bodies.TelawatBody;
 public class MainActivity extends AppCompatActivity implements SwipeRefreshLayout.OnRefreshListener {
 
     private static final int ITEM_KEY = R.id.ifRoom;
+    private static final int ROW_INDEX = R.id.clip_vertical;
     AlertDialog.Builder builder;
     private View view;
     private SwipeRefreshLayout swipeRefreshLayout;
     private LinearLayout telawatList;
     MediaPlayer currentMp = null;
+    View currentRow = null;
 
     LayoutInflater inflater;
     private int mediaFileLengthInMilliseconds;
@@ -149,6 +154,7 @@ public class MainActivity extends AppCompatActivity implements SwipeRefreshLayou
             final EntriesItem item = entries.get(position);
 
             view.setTag(ITEM_KEY, item);
+            view.setTag(ROW_INDEX, position);
 
             view.setOnClickListener(v -> playTelawa(((EntriesItem) v.getTag(ITEM_KEY)).getPath(), v));
 
@@ -157,12 +163,18 @@ public class MainActivity extends AppCompatActivity implements SwipeRefreshLayou
             surah.setText(item.getTitle());
 
             telawatList.addView(view);
+
+            if (telawatList != null && telawatList.getChildAt(0) != null)
+                telawatList.getChildAt(0).performClick();
         }
     }
 
     private void playTelawa(String path, View view) {
         try {
-
+            if (currentRow != null) {
+                currentRow.findViewById(R.id.mediaController).setVisibility(View.GONE);
+            }
+            currentRow = view;
             ImageView avatar;
             ImageView mediaExitButton;
             SeekBar seekBar;
@@ -185,9 +197,20 @@ public class MainActivity extends AppCompatActivity implements SwipeRefreshLayou
             mediaController = view.findViewById(R.id.mediaController);
 
 
+            download.setOnClickListener(v -> startDownload(((EntriesItem) view.getTag(ITEM_KEY)).getPath()));
+
+            share.setOnClickListener(v -> {
+                EntriesItem item = ((EntriesItem) view.getTag(ITEM_KEY));
+                Intent sendIntent = new Intent();
+                sendIntent.setAction(Intent.ACTION_SEND);
+                sendIntent.putExtra(Intent.EXTRA_TEXT, item.getTitle() + "\n" + item.getReciterName() + "\n" + item.getPath());
+                sendIntent.setType("text/plain");
+                startActivity(sendIntent);
+            });
+
             MediaPlayer mp = new MediaPlayer();
 
-            if(currentMp != null)
+            if (currentMp != null)
                 currentMp.pause();
 
             currentMp = mp;
@@ -218,7 +241,12 @@ public class MainActivity extends AppCompatActivity implements SwipeRefreshLayou
             });
             mp.setOnBufferingUpdateListener((mp1, percent) -> seekBar.setSecondaryProgress(percent));
             mp.setOnCompletionListener(mp1 -> {
+                int position = ((int) currentRow.getTag(ROW_INDEX));
 
+                currentRow.findViewById(R.id.mediaController).setVisibility(View.GONE);
+                if (++position < telawatList.getChildCount()) {
+                    telawatList.getChildAt(position).performClick();
+                }
             });
 
 
@@ -229,10 +257,10 @@ public class MainActivity extends AppCompatActivity implements SwipeRefreshLayou
                 mediaFileLengthInMilliseconds = mp.getDuration(); // gets the song length in milliseconds from URL
                 if (!mp.isPlaying()) {
                     mp.start();
-                    //holder.mediaButton.setImageResource(R.drawable.ic_pause);
+                    mediaButton.setImageResource(android.R.drawable.ic_media_pause);
                 } else {
                     mp.pause();
-                    //holder.mediaButton.setImageResource(R.drawable.ic_play);
+                    mediaButton.setImageResource(android.R.drawable.ic_media_play);
                 }
                 primarySeekBarProgressUpdater(view, mp);
             });
@@ -290,13 +318,23 @@ public class MainActivity extends AppCompatActivity implements SwipeRefreshLayou
 
     @Override
     public void onRefresh() {
-        if(currentMp != null)
+        if (currentMp != null)
             currentMp.stop();
         telawatList.removeAllViews();
 
         Handler handler = new Handler(getMainLooper());
         handler.postDelayed(() -> swipeRefreshLayout.setRefreshing(false), 500);
         loadTelawat();
+    }
+
+
+    public void startDownload(String link) {
+        DownloadManager mManager = (DownloadManager) getSystemService(Context.DOWNLOAD_SERVICE);
+        DownloadManager.Request mRqRequest = new DownloadManager.Request(
+                Uri.parse(link));
+        mRqRequest.setDescription("This is Test File");
+//  mRqRequest.setDestinationUri(Uri.parse("give your local path"));
+        long idDownLoad = mManager.enqueue(mRqRequest);
     }
 
 
