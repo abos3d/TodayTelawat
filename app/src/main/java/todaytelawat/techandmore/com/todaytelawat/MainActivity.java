@@ -2,6 +2,7 @@ package todaytelawat.techandmore.com.todaytelawat;
 
 import android.Manifest;
 import android.app.DownloadManager;
+import android.app.ProgressDialog;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
@@ -19,6 +20,7 @@ import android.support.v4.widget.SwipeRefreshLayout;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.util.AttributeSet;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.ImageView;
@@ -53,7 +55,7 @@ public class MainActivity extends AppCompatActivity implements SwipeRefreshLayou
     private View view;
     private SwipeRefreshLayout swipeRefreshLayout;
     private LinearLayout telawatList;
-    MediaPlayer currentMp = null;
+    MediaPlayer mPlayer = new MediaPlayer();
     View currentRow = null;
 
     LayoutInflater inflater;
@@ -137,29 +139,19 @@ public class MainActivity extends AppCompatActivity implements SwipeRefreshLayou
         for (int position = 0; position < entries.size(); position++) {
             View view = inflater.inflate(R.layout.telawa_row, telawatList, false);
 
-            ImageView avatar;
-            ImageView mediaExitButton;
-            SeekBar seekBar;
-            TextView mediaTime;
-            TextView name;
-            TextView surah;
-            ImageView mediaButton;
-            ImageView share;
-            ImageView download;
-            View mediaController;
-            View textContainer;
-            avatar = view.findViewById(R.id.avatar);
-            mediaExitButton = view.findViewById(R.id.mediaExitButton);
-            seekBar = view.findViewById(R.id.seekBar);
-            mediaTime = view.findViewById(R.id.mediaTime);
-            name = view.findViewById(R.id.name);
-            surah = view.findViewById(R.id.surah);
-            mediaButton = view.findViewById(R.id.mediaButton);
-            share = view.findViewById(R.id.share);
-            download = view.findViewById(R.id.download);
-            mediaController = view.findViewById(R.id.mediaController);
-            textContainer = view.findViewById(R.id.textContainer);
+            ImageView avatar = view.findViewById(R.id.avatar);
+            ImageView mediaExitButton = view.findViewById(R.id.mediaExitButton);
+            SeekBar seekBar = view.findViewById(R.id.seekBar);
+            TextView mediaTime = view.findViewById(R.id.mediaTime);
+            TextView name = view.findViewById(R.id.name);
+            TextView surah = view.findViewById(R.id.surah);
+            ImageView mediaButton = view.findViewById(R.id.mediaButton);
+            ImageView share = view.findViewById(R.id.share);
+            ImageView download = view.findViewById(R.id.download);
+            View mediaController = view.findViewById(R.id.mediaController);
+            View textContainer = view.findViewById(R.id.textContainer);
 
+            seekBar.setMax(99); // It means 100% .0-99
 
             final EntriesItem item = entries.get(position);
 
@@ -171,6 +163,16 @@ public class MainActivity extends AppCompatActivity implements SwipeRefreshLayou
             Picasso.with(MainActivity.this).load(item.getReciterPhoto()).into(avatar);
             name.setText(item.getReciterName());
             surah.setText(item.getTitle());
+
+            download.setOnClickListener(v -> startDownload(((EntriesItem) view.getTag(ITEM_KEY)).getPath(), ((EntriesItem) view.getTag(ITEM_KEY)).getTitle()));
+
+            share.setOnClickListener(v -> {
+                Intent sendIntent = new Intent();
+                sendIntent.setAction(Intent.ACTION_SEND);
+                sendIntent.putExtra(Intent.EXTRA_TEXT, item.getTitle() + "\n" + item.getReciterName() + "\n" + item.getPath());
+                sendIntent.setType("text/plain");
+                startActivity(sendIntent);
+            });
 
             telawatList.addView(view);
         }
@@ -184,103 +186,101 @@ public class MainActivity extends AppCompatActivity implements SwipeRefreshLayou
             if (currentRow != null) {
                 currentRow.findViewById(R.id.mediaController).setVisibility(View.GONE);
             }
+
             currentRow = view;
-            ImageView avatar;
-            ImageView mediaExitButton;
-            SeekBar seekBar;
-            TextView mediaTime;
-            TextView name;
-            TextView surah;
-            ImageView mediaButton;
-            ImageView share;
-            ImageView download;
-            View mediaController;
-            avatar = view.findViewById(R.id.avatar);
-            mediaExitButton = view.findViewById(R.id.mediaExitButton);
-            seekBar = view.findViewById(R.id.seekBar);
-            mediaTime = view.findViewById(R.id.mediaTime);
-            name = view.findViewById(R.id.name);
-            surah = view.findViewById(R.id.surah);
-            mediaButton = view.findViewById(R.id.mediaButton);
-            share = view.findViewById(R.id.share);
-            download = view.findViewById(R.id.download);
-            mediaController = view.findViewById(R.id.mediaController);
 
+            ImageView avatar = view.findViewById(R.id.avatar);
+            ImageView mediaExitButton = view.findViewById(R.id.mediaExitButton);
+            SeekBar seekBar = view.findViewById(R.id.seekBar);
+            TextView mediaTime = view.findViewById(R.id.mediaTime);
+            TextView name = view.findViewById(R.id.name);
+            TextView surah = view.findViewById(R.id.surah);
+            ImageView mediaButton = view.findViewById(R.id.mediaButton);
+            ImageView share = view.findViewById(R.id.share);
+            ImageView download = view.findViewById(R.id.download);
+            View mediaController = view.findViewById(R.id.mediaController);
+            View textContainer = view.findViewById(R.id.textContainer);
 
-            download.setOnClickListener(v -> startDownload(((EntriesItem) view.getTag(ITEM_KEY)).getPath(), ((EntriesItem) view.getTag(ITEM_KEY)).getTitle()));
-
-            share.setOnClickListener(v -> {
-                EntriesItem item = ((EntriesItem) view.getTag(ITEM_KEY));
-                Intent sendIntent = new Intent();
-                sendIntent.setAction(Intent.ACTION_SEND);
-                sendIntent.putExtra(Intent.EXTRA_TEXT, item.getTitle() + "\n" + item.getReciterName() + "\n" + item.getPath());
-                sendIntent.setType("text/plain");
-                startActivity(sendIntent);
-            });
-
-            MediaPlayer mp = new MediaPlayer();
-
-            if (currentMp != null)
-                currentMp.pause();
-
-            currentMp = mp;
+            mPlayer.setOnCompletionListener(null);
+            mPlayer.reset();
 
             mediaController.setVisibility(View.VISIBLE);
 
-            mp.setDataSource(path);
+            mPlayer.setDataSource(path);
 
 
-            mp.setAudioStreamType(AudioManager.STREAM_MUSIC);
+            mPlayer.setAudioStreamType(AudioManager.STREAM_MUSIC);
 
-            mp.prepare(); // don't use prepareAsync for mp3 playback
-            mp.start();
-//            mp.prepareAsync();
+            // mp.prepare(); // don't use prepareAsync for mp3 playback
+            //mp.start();
+            mPlayer.prepareAsync();
 
-//            mp.setOnPreparedListener(mediaPlayer -> {
-//                mediaPlayer.start();
+            final ProgressDialog progressDialog = ProgressDialog.show(this, "", "جاري تشغيل الملف الصوتي");
+            progressDialog.setCancelable(true);
+
+            mPlayer.setOnPreparedListener(mediaPlayer -> {
+                mediaFileLengthInMilliseconds = mediaPlayer.getDuration(); // gets the song length in milliseconds from URL
+                mediaPlayer.start();
+                progressDialog.dismiss();
+                primarySeekBarProgressUpdater(view, mediaPlayer);
+
+                mPlayer.setOnCompletionListener(mp1 -> {
+                    int position = ((int) currentRow.getTag(ROW_INDEX));
+
+                    currentRow.findViewById(R.id.mediaController).setVisibility(View.GONE);
+                    if (++position < telawatList.getChildCount()) {
+                        telawatList.getChildAt(position).findViewById(R.id.textContainer).performClick();
+                    }
+                });
+            });
+
+
+//            seekBar.setOnTouchListener((v, event) -> {
+//                /** Seekbar onTouch event handler. Method which seeks MediaPlayer to seekBar primary progress position*/
+//                if (mPlayer.isPlaying()) {
+//                    SeekBar sb = (SeekBar) v;
+//                    int playPositionInMillisecconds = (mediaFileLengthInMilliseconds / 100) * sb.getProgress();
+//                    mPlayer.seekTo(playPositionInMillisecconds);
+//                }
+//                return false;
 //            });
+//
+            seekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+                @Override
+                public void onProgressChanged(SeekBar seekBar, int i, boolean b) {
 
-            mediaFileLengthInMilliseconds = mp.getDuration(); // gets the song length in milliseconds from URL
-
-
-            seekBar.setOnTouchListener((v, event) -> {
-                /** Seekbar onTouch event handler. Method which seeks MediaPlayer to seekBar primary progress position*/
-                if (mp.isPlaying()) {
-                    SeekBar sb = (SeekBar) v;
-                    int playPositionInMillisecconds = (mediaFileLengthInMilliseconds / 100) * sb.getProgress();
-                    mp.seekTo(playPositionInMillisecconds);
                 }
-                return false;
-            });
-            mp.setOnBufferingUpdateListener((mp1, percent) -> seekBar.setSecondaryProgress(percent));
-            mp.setOnCompletionListener(mp1 -> {
-                int position = ((int) currentRow.getTag(ROW_INDEX));
 
-                currentRow.findViewById(R.id.mediaController).setVisibility(View.GONE);
-                if (++position < telawatList.getChildCount()) {
-                    telawatList.getChildAt(position).performClick();
+                @Override
+                public void onStartTrackingTouch(SeekBar seekBar) {
+                }
+
+                @Override
+                public void onStopTrackingTouch(SeekBar seekBar) {
+                    if (mPlayer.isPlaying()) {
+                        int playPositionInMillisecconds = (mediaFileLengthInMilliseconds / 100) * seekBar.getProgress();
+                        mPlayer.seekTo(playPositionInMillisecconds);
+                    }
                 }
             });
 
-
-            primarySeekBarProgressUpdater(view, mp);
-
+            mPlayer.setOnBufferingUpdateListener((mp1, percent) -> seekBar.setSecondaryProgress(percent));
 
             mediaButton.setOnClickListener(v -> {
-                mediaFileLengthInMilliseconds = mp.getDuration(); // gets the song length in milliseconds from URL
-                if (!mp.isPlaying()) {
-                    mp.start();
+                mediaFileLengthInMilliseconds = mPlayer.getDuration(); // gets the song length in milliseconds from URL
+                if (!mPlayer.isPlaying()) {
+                    mPlayer.start();
                     mediaButton.setImageResource(android.R.drawable.ic_media_pause);
                 } else {
-                    mp.pause();
+                    mPlayer.pause();
                     mediaButton.setImageResource(android.R.drawable.ic_media_play);
                 }
-                primarySeekBarProgressUpdater(view, mp);
+                primarySeekBarProgressUpdater(view, mPlayer);
             });
 
 
             mediaExitButton.setOnClickListener(v -> {
-                mp.pause();
+                mPlayer.pause();
                 mediaController.setVisibility(View.GONE);
             });
 
@@ -297,7 +297,7 @@ public class MainActivity extends AppCompatActivity implements SwipeRefreshLayou
      * @param view
      * @param mp
      */
-    private void primarySeekBarProgressUpdater(View view, MediaPlayer mp) {
+    synchronized private void primarySeekBarProgressUpdater(View view, MediaPlayer mp) {
         SeekBar seekBar;
         TextView mediaTime;
 
@@ -321,21 +321,22 @@ public class MainActivity extends AppCompatActivity implements SwipeRefreshLayou
         if (mp.isPlaying()) {
             Runnable notification = () -> primarySeekBarProgressUpdater(view, mp);
             handler.postDelayed(notification, 1000);
+            Log.d("handler", "delay applied");
         }
     }
 
 
     @Override
     public void onRefresh() {
-        if (currentMp != null) {
-            currentMp.stop();
+        if (mPlayer != null) {
+            mPlayer.stop();
         }
         telawatList.removeAllViews();
 
         Handler handler = new Handler(getMainLooper());
         handler.postDelayed(() -> swipeRefreshLayout.setRefreshing(false), 500);
         currentRow = null;
-        currentMp = null;
+        mPlayer.reset();
         loadTelawat();
     }
 
