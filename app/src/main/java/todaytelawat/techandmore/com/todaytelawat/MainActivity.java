@@ -1,14 +1,20 @@
 package todaytelawat.techandmore.com.todaytelawat;
 
+import android.Manifest;
 import android.app.DownloadManager;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.media.AudioManager;
 import android.media.MediaPlayer;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Environment;
 import android.os.Handler;
+import android.support.annotation.NonNull;
 import android.support.design.widget.Snackbar;
+import android.support.v4.app.ActivityCompat;
+import android.support.v4.content.ContextCompat;
 import android.support.v4.widget.SwipeRefreshLayout;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
@@ -19,6 +25,7 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.SeekBar;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import com.squareup.picasso.Picasso;
 
@@ -41,6 +48,7 @@ public class MainActivity extends AppCompatActivity implements SwipeRefreshLayou
 
     private static final int ITEM_KEY = R.id.ifRoom;
     private static final int ROW_INDEX = R.id.clip_vertical;
+    private static final int WRITE_EXTERNAL_STORAGE_CODE = 56;
     AlertDialog.Builder builder;
     private View view;
     private SwipeRefreshLayout swipeRefreshLayout;
@@ -139,6 +147,7 @@ public class MainActivity extends AppCompatActivity implements SwipeRefreshLayou
             ImageView share;
             ImageView download;
             View mediaController;
+            View textContainer;
             avatar = view.findViewById(R.id.avatar);
             mediaExitButton = view.findViewById(R.id.mediaExitButton);
             seekBar = view.findViewById(R.id.seekBar);
@@ -149,6 +158,7 @@ public class MainActivity extends AppCompatActivity implements SwipeRefreshLayou
             share = view.findViewById(R.id.share);
             download = view.findViewById(R.id.download);
             mediaController = view.findViewById(R.id.mediaController);
+            textContainer = view.findViewById(R.id.textContainer);
 
 
             final EntriesItem item = entries.get(position);
@@ -156,17 +166,17 @@ public class MainActivity extends AppCompatActivity implements SwipeRefreshLayou
             view.setTag(ITEM_KEY, item);
             view.setTag(ROW_INDEX, position);
 
-            view.setOnClickListener(v -> playTelawa(((EntriesItem) v.getTag(ITEM_KEY)).getPath(), v));
+            textContainer.setOnClickListener(v -> playTelawa(((EntriesItem) view.getTag(ITEM_KEY)).getPath(), view));
 
             Picasso.with(MainActivity.this).load(item.getReciterPhoto()).into(avatar);
             name.setText(item.getReciterName());
             surah.setText(item.getTitle());
 
             telawatList.addView(view);
-
-            if (telawatList != null && telawatList.getChildAt(0) != null)
-                telawatList.getChildAt(0).performClick();
         }
+
+        if (telawatList != null && telawatList.getChildAt(0) != null)
+            telawatList.getChildAt(0).findViewById(R.id.textContainer).performClick();
     }
 
     private void playTelawa(String path, View view) {
@@ -197,7 +207,7 @@ public class MainActivity extends AppCompatActivity implements SwipeRefreshLayou
             mediaController = view.findViewById(R.id.mediaController);
 
 
-            download.setOnClickListener(v -> startDownload(((EntriesItem) view.getTag(ITEM_KEY)).getPath()));
+            download.setOnClickListener(v -> startDownload(((EntriesItem) view.getTag(ITEM_KEY)).getPath(), ((EntriesItem) view.getTag(ITEM_KEY)).getTitle()));
 
             share.setOnClickListener(v -> {
                 EntriesItem item = ((EntriesItem) view.getTag(ITEM_KEY));
@@ -219,13 +229,16 @@ public class MainActivity extends AppCompatActivity implements SwipeRefreshLayou
 
             mp.setDataSource(path);
 
-//            mp.prepareAsync();
 
             mp.setAudioStreamType(AudioManager.STREAM_MUSIC);
 
             mp.prepare(); // don't use prepareAsync for mp3 playback
-
             mp.start();
+//            mp.prepareAsync();
+
+//            mp.setOnPreparedListener(mediaPlayer -> {
+//                mediaPlayer.start();
+//            });
 
             mediaFileLengthInMilliseconds = mp.getDuration(); // gets the song length in milliseconds from URL
 
@@ -306,11 +319,7 @@ public class MainActivity extends AppCompatActivity implements SwipeRefreshLayou
 
         seekBar.setProgress((int) (((float) mp.getCurrentPosition() / mediaFileLengthInMilliseconds) * 100)); // This math construction give a percentage of "was playing"/"song length"
         if (mp.isPlaying()) {
-            Runnable notification = new Runnable() {
-                public void run() {
-                    primarySeekBarProgressUpdater(view, mp);
-                }
-            };
+            Runnable notification = () -> primarySeekBarProgressUpdater(view, mp);
             handler.postDelayed(notification, 1000);
         }
     }
@@ -318,24 +327,55 @@ public class MainActivity extends AppCompatActivity implements SwipeRefreshLayou
 
     @Override
     public void onRefresh() {
-        if (currentMp != null)
+        if (currentMp != null) {
             currentMp.stop();
+        }
         telawatList.removeAllViews();
 
         Handler handler = new Handler(getMainLooper());
         handler.postDelayed(() -> swipeRefreshLayout.setRefreshing(false), 500);
+        currentRow = null;
+        currentMp = null;
         loadTelawat();
     }
 
 
-    public void startDownload(String link) {
-        DownloadManager mManager = (DownloadManager) getSystemService(Context.DOWNLOAD_SERVICE);
-        DownloadManager.Request mRqRequest = new DownloadManager.Request(
-                Uri.parse(link));
-        mRqRequest.setDescription("This is Test File");
-//  mRqRequest.setDestinationUri(Uri.parse("give your local path"));
-        long idDownLoad = mManager.enqueue(mRqRequest);
+    public void startDownload(String link, String name) {
+        if (ContextCompat.checkSelfPermission(MainActivity.this, Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                != PackageManager.PERMISSION_GRANTED) {
+
+            ActivityCompat.requestPermissions(MainActivity.this,
+                    new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE},
+                    WRITE_EXTERNAL_STORAGE_CODE);
+
+
+            return;
+        } else {
+            DownloadManager mManager = (DownloadManager) getSystemService(Context.DOWNLOAD_SERVICE);
+            DownloadManager.Request mRqRequest = new DownloadManager.Request(
+                    Uri.parse(link));
+
+
+            mRqRequest.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, name + ".mp3");
+            mRqRequest.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED); // to notify when download is complete
+            mRqRequest.allowScanningByMediaScanner();// if you want to be available from media players
+
+            long idDownLoad = mManager.enqueue(mRqRequest);
+        }
     }
 
 
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+
+        if (requestCode == WRITE_EXTERNAL_STORAGE_CODE) {
+            if (grantResults.length > 0
+                    && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                startDownload(((EntriesItem) currentRow.getTag(ITEM_KEY)).getPath(), ((EntriesItem) currentRow.getTag(ITEM_KEY)).getTitle());
+            } else {
+                Toast.makeText(MainActivity.this, R.string.permissionDeniedError, Toast.LENGTH_LONG).show();
+            }
+        }
+    }
 }

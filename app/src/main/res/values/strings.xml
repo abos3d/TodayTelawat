@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">Today Telawat</string>
+    <string name="permissionDeniedError">Permission Denied</string>
 </resources>

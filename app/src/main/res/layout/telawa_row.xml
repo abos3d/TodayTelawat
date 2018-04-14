@@ -22,6 +22,11 @@
         android:layout_weight="6"
         android:orientation="vertical">
 
+        <LinearLayout
+            android:id="@+id/textContainer"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
 
         <TextView
             android:id="@+id/name"
@@ -38,6 +43,8 @@
             android:layout_height="wrap_content"
             android:layout_margin="8dp"
             tools:text="sdlafkjfh" />
+
+        </LinearLayout>
 
         <LinearLayout
             android:id="@+id/mediaController"
