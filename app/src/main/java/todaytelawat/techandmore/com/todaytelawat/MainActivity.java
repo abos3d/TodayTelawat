@@ -19,7 +19,6 @@ import android.support.v4.content.ContextCompat;
 import android.support.v4.widget.SwipeRefreshLayout;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
-import android.util.AttributeSet;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -64,17 +63,10 @@ public class MainActivity extends AppCompatActivity implements SwipeRefreshLayou
     private final Handler handler = new Handler();
 
     @Override
-    public View onCreateView(String name, Context context, AttributeSet attrs) {
-        view = super.onCreateView(name, context, attrs);
-        return view;
+    public void setContentView(int layoutResID) {
+        view = getLayoutInflater().inflate(layoutResID, null, false);
+        super.setContentView(view);
     }
-
-    @Override
-    public View onCreateView(View parent, String name, Context context, AttributeSet attrs) {
-        view = super.onCreateView(name, context, attrs);
-        return view;
-    }
-
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -127,6 +119,7 @@ public class MainActivity extends AppCompatActivity implements SwipeRefreshLayou
                         loadTelawat();
                     }
                 });
+                s.show();
                 findViewById(R.id.progressView).setVisibility(View.GONE);
             }
         });
