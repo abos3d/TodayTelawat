@@ -56,6 +56,7 @@ public class MainActivity extends AppCompatActivity implements SwipeRefreshLayou
     private LinearLayout telawatList;
     MediaPlayer mPlayer = new MediaPlayer();
     View currentRow = null;
+    Snackbar snackbar;
 
     LayoutInflater inflater;
     private int mediaFileLengthInMilliseconds;
@@ -111,15 +112,15 @@ public class MainActivity extends AppCompatActivity implements SwipeRefreshLayou
 
             @Override
             public void onFailure(final Call<ResponseContainer> call, Throwable t) {
-                final Snackbar s = Snackbar.make(view, "حدث خطأ في الإتصال بالإنترنت يرجى المحالة لاحقا", Snackbar.LENGTH_INDEFINITE);
-                s.setAction("إعادة المحاولة", new View.OnClickListener() {
+                snackbar = Snackbar.make(view, "حدث خطأ في الإتصال بالإنترنت يرجى المحالة لاحقا", Snackbar.LENGTH_INDEFINITE);
+                snackbar.setAction("إعادة المحاولة", new View.OnClickListener() {
                     @Override
                     public void onClick(View v) {
-                        s.dismiss();
+                        snackbar.dismiss();
                         loadTelawat();
                     }
                 });
-                s.show();
+                snackbar.show();
                 findViewById(R.id.progressView).setVisibility(View.GONE);
             }
         });
@@ -218,6 +219,8 @@ public class MainActivity extends AppCompatActivity implements SwipeRefreshLayou
                 primarySeekBarProgressUpdater(view, mediaPlayer);
 
                 mPlayer.setOnCompletionListener(mp1 -> {
+                    if (currentRow == null)
+                        return;
                     int position = ((int) currentRow.getTag(ROW_INDEX));
 
                     currentRow.findViewById(R.id.mediaController).setVisibility(View.GONE);
@@ -324,7 +327,11 @@ public class MainActivity extends AppCompatActivity implements SwipeRefreshLayou
         if (mPlayer != null) {
             mPlayer.stop();
         }
-        telawatList.removeAllViews();
+        if (telawatList != null)
+            telawatList.removeAllViews();
+
+        if (snackbar != null && snackbar.isShown())
+            snackbar.dismiss();
 
         Handler handler = new Handler(getMainLooper());
         handler.postDelayed(() -> swipeRefreshLayout.setRefreshing(false), 500);
