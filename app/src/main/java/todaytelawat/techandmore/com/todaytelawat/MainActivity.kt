@@ -6,29 +6,39 @@ import android.app.ProgressDialog
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.media.AudioAttributes
-import android.media.AudioManager
 import android.media.MediaPlayer
 import android.net.Uri
 import android.os.Bundle
 import android.os.Environment
 import android.os.Handler
 import android.util.Log
-import android.view.LayoutInflater
 import android.view.View
+import android.view.ViewGroup
 import android.widget.ImageView
-import android.widget.LinearLayout
 import android.widget.SeekBar
 import android.widget.SeekBar.OnSeekBarChangeListener
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.app.AppCompatDelegate
+import androidx.appcompat.widget.Toolbar
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.lifecycleScope
+import androidx.preference.PreferenceManager.getDefaultSharedPreferences
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
+import androidx.recyclerview.widget.RecyclerView.ViewHolder
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout.OnRefreshListener
 import com.google.android.material.snackbar.Snackbar
 import com.squareup.picasso.Picasso
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Call
@@ -46,11 +56,11 @@ class MainActivity : AppCompatActivity(), OnRefreshListener {
     var builder: AlertDialog.Builder? = null
     private var view: View? = null
     private lateinit var swipeRefreshLayout: SwipeRefreshLayout
-    private var telawatList: LinearLayout? = null
+
+    lateinit var telawatRT: RecyclerView
     var mPlayer: MediaPlayer? = MediaPlayer()
     var currentRow: View? = null
-    var snackbar: Snackbar? = null
-    var inflater: LayoutInflater? = null
+    var currentRowModel: EntriesItem? = null
     private var mediaFileLengthInMilliseconds = 0
     private val handler = Handler()
     override fun setContentView(layoutResID: Int) {
@@ -64,8 +74,41 @@ class MainActivity : AppCompatActivity(), OnRefreshListener {
         swipeRefreshLayout = findViewById(R.id.swipeRefresh)
         swipeRefreshLayout.setOnRefreshListener(this)
         builder = AlertDialog.Builder(this@MainActivity)
-        inflater = LayoutInflater.from(this)
         loadTelawat()
+
+        setupToolbar()
+    }
+
+    private fun setupToolbar() {
+        findViewById<Toolbar>(R.id.toolbar).setOnMenuItemClickListener {
+            when (it.itemId) {
+                R.id.about -> {
+                    val dialog = AlertDialog.Builder(this).setMessage(
+                        """
+    تطوير مصعب العثمان
+    للاقتراحات التواصل على
+    musab.on@gmail.com
+    twitter: _abos3d_
+    لاتنسونا من صالح دعائكم
+    """.trimIndent()
+                    ).create()
+                    dialog.show()
+                    return@setOnMenuItemClickListener true
+                }
+                R.id.mode -> {
+
+                    if(AppCompatDelegate.getDefaultNightMode() == AppCompatDelegate.MODE_NIGHT_YES)
+                        AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO)
+                    else
+                        AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
+
+                    SharedPrefManager(getDefaultSharedPreferences(this)).mode = AppCompatDelegate.getDefaultNightMode()
+
+                    return@setOnMenuItemClickListener true
+                }
+                else -> return@setOnMenuItemClickListener false
+            }
+        }
     }
 
     private fun loadTelawat() {
@@ -87,86 +130,112 @@ class MainActivity : AppCompatActivity(), OnRefreshListener {
                 response: Response<ResponseContainer>
             ) {
                 findViewById<View>(R.id.progressView).visibility = View.GONE
+
                 fillTelawat(response.body()!!.eContent.entries)
             }
 
             override fun onFailure(call: Call<ResponseContainer>, t: Throwable) {
-                snackbar = Snackbar.make(
+                val snackbar = Snackbar.make(
                     view!!,
                     "حدث خطأ في الإتصال بالإنترنت يرجى المحالة لاحقا",
-                    Snackbar.LENGTH_INDEFINITE
+                    Snackbar.LENGTH_SHORT
                 )
-                snackbar!!.setAction("إعادة المحاولة") {
-                    snackbar!!.dismiss()
+                snackbar.setAction("إعادة المحاولة") {
+                    snackbar.dismiss()
                     loadTelawat()
                 }
-                snackbar!!.show()
+                snackbar.show()
                 findViewById<View>(R.id.progressView).visibility = View.GONE
             }
         })
     }
 
-    private fun fillTelawat(entries: List<EntriesItem>) {
-        telawatList = findViewById(R.id.telawatList)
-        telawatList?.visibility = View.VISIBLE
-        for (position in entries.indices) {
-            val view = inflater!!.inflate(R.layout.telawa_row, telawatList, false)
-            val avatar = view.findViewById<ImageView>(R.id.avatar)
-            val mediaExitButton = view.findViewById<ImageView>(R.id.mediaExitButton)
-            val seekBar = view.findViewById<SeekBar>(R.id.seekBar)
-            val mediaTime = view.findViewById<TextView>(R.id.mediaTime)
-            val name = view.findViewById<TextView>(R.id.name)
-            val surah = view.findViewById<TextView>(R.id.surah)
-            val mediaButton = view.findViewById<ImageView>(R.id.mediaButton)
-            val share = view.findViewById<ImageView>(R.id.share)
-            val download = view.findViewById<ImageView>(R.id.download)
-            val mediaController = view.findViewById<View>(R.id.mediaController)
-            val textContainer = view.findViewById<View>(R.id.textContainer)
-            seekBar.max = 99 // It means 100% .0-99
-            val item = entries[position]
-            view.setTag(ITEM_KEY, item)
-            view.setTag(ROW_INDEX, position)
-            textContainer.setOnClickListener { v: View? ->
-                playTelawa(
-                    (view.getTag(ITEM_KEY) as EntriesItem).path,
-                    view
-                )
-            }
-            Picasso.with(this@MainActivity).load(item.reciterPhoto).into(avatar)
-            name.text = item.reciterName
-            surah.text = item.title
-            download.setOnClickListener { v: View? ->
-                startDownload(
-                    (view.getTag(ITEM_KEY) as EntriesItem).path, (view.getTag(
-                        ITEM_KEY
-                    ) as EntriesItem).title
-                )
-            }
-            share.setOnClickListener { v: View? ->
-                val sendIntent = Intent()
-                sendIntent.setAction(Intent.ACTION_SEND)
-                sendIntent.putExtra(
-                    Intent.EXTRA_TEXT, """
-     ${item.title}
-     ${item.reciterName}
-     ${item.path}
-     """.trimIndent()
-                )
-                sendIntent.setType("text/plain")
-                startActivity(sendIntent)
-            }
-            telawatList?.addView(view)
-        }
-        if (telawatList != null && telawatList!!.getChildAt(0) != null) telawatList!!.getChildAt(0)
-            .findViewById<View>(R.id.textContainer).performClick()
-    }
 
+
+
+    private fun fillTelawat(entries: List<EntriesItem>) {
+        telawatRT = findViewById(R.id.telawatRT)
+        telawatRT.visibility = View.VISIBLE
+        val inflater = layoutInflater
+
+
+        telawatRT.layoutManager = LinearLayoutManager(this)
+
+        telawatRT.adapter = object : RecyclerView.Adapter<ViewHolder>() {
+            override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
+                val view = inflater.inflate(R.layout.telawa_row, parent, false)
+                return object : ViewHolder(view){}
+            }
+
+            override fun getItemCount(): Int = entries.size
+
+            override fun onBindViewHolder(holder: ViewHolder, position: Int) {
+                val view = holder.itemView
+
+                val avatar = view.findViewById<ImageView>(R.id.avatar)
+                val mediaExitButton = view.findViewById<ImageView>(R.id.mediaExitButton)
+                val seekBar = view.findViewById<SeekBar>(R.id.seekBar)
+                val mediaTime = view.findViewById<TextView>(R.id.mediaTime)
+                val name = view.findViewById<TextView>(R.id.name)
+                val surah = view.findViewById<TextView>(R.id.surah)
+                val mediaButton = view.findViewById<ImageView>(R.id.mediaButton)
+                val share = view.findViewById<ImageView>(R.id.share)
+                val download = view.findViewById<ImageView>(R.id.download)
+                val mediaController = view.findViewById<View>(R.id.mediaController)
+                val textContainer = view.findViewById<View>(R.id.textContainer)
+                seekBar.max = 99 // It means 100% .0-99
+
+                view.setOnClickListener {
+                    if (currentRow != null) {
+                        currentRow!!.findViewById<View>(R.id.mediaController).visibility = View.GONE
+                    }
+                    currentRow = view
+                    currentRowModel = entries[position]
+
+                    playTelawa(entries[position].path, view)
+                }
+                Picasso.with(this@MainActivity).load(entries[position].reciterPhoto).into(avatar)
+                name.text = entries[position].reciterName
+                surah.text = entries[position].title
+
+                download.setOnClickListener { startDownload(entries[position].path, entries[position].title) }
+
+                share.setOnClickListener {
+                    val sendIntent = Intent()
+                    sendIntent.setAction(Intent.ACTION_SEND)
+                    sendIntent.putExtra(
+                        Intent.EXTRA_TEXT, """
+     ${entries[position].title}
+     ${entries[position].reciterName}
+     ${entries[position].path}
+     """.trimIndent()
+                    )
+                    sendIntent.setType("text/plain")
+                    startActivity(sendIntent)
+                }
+            }
+
+        }
+
+
+        lifecycleScope.launch {
+            flow {
+                while (telawatRT.getChildAt(0) == null) { }
+                emit(0)
+            }.flowOn(Dispatchers.IO)
+                .collect {
+                    telawatRT.getChildAt(0)?.let {
+                        it.performClick()
+                    }
+                }
+        }
+
+
+
+
+    }
     private fun playTelawa(path: String, view: View) {
         try {
-            if (currentRow != null) {
-                currentRow!!.findViewById<View>(R.id.mediaController).visibility = View.GONE
-            }
-            currentRow = view
             val avatar = view.findViewById<ImageView>(R.id.avatar)
             val mediaExitButton = view.findViewById<ImageView>(R.id.mediaExitButton)
             val seekBar = view.findViewById<SeekBar>(R.id.seekBar)
@@ -180,6 +249,7 @@ class MainActivity : AppCompatActivity(), OnRefreshListener {
             val textContainer = view.findViewById<View>(R.id.textContainer)
             mPlayer!!.setOnCompletionListener(null)
             mPlayer!!.reset()
+            mediaButton.setImageResource(android.R.drawable.ic_media_pause)
             mediaController.visibility = View.VISIBLE
             mPlayer!!.setDataSource(path)
             mPlayer!!.setAudioAttributes(
@@ -197,29 +267,18 @@ class MainActivity : AppCompatActivity(), OnRefreshListener {
                     mediaPlayer.duration // gets the song length in milliseconds from URL
                 mediaPlayer.start()
                 progressDialog.dismiss()
-                primarySeekBarProgressUpdater(view, mediaPlayer)
+                lifecycleScope.launch { primarySeekBarProgressUpdater(view, mediaPlayer) }
                 mPlayer!!.setOnCompletionListener { mp1: MediaPlayer? ->
                     if (currentRow == null) return@setOnCompletionListener
-                    var position = currentRow!!.getTag(ROW_INDEX) as Int
+                    var position = telawatRT.getChildAdapterPosition(currentRow!!)
                     currentRow!!.findViewById<View>(R.id.mediaController).visibility = View.GONE
-                    if (++position < telawatList!!.childCount) {
-                        telawatList!!.getChildAt(position).findViewById<View>(R.id.textContainer)
-                            .performClick()
+                    if (++position < telawatRT.adapter!!.itemCount) {
+                        telawatRT.getChildAt(position).performClick()
                     }
                 }
             }
 
 
-//            seekBar.setOnTouchListener((v, event) -> {
-//                /** Seekbar onTouch event handler. Method which seeks MediaPlayer to seekBar primary progress position*/
-//                if (mPlayer.isPlaying()) {
-//                    SeekBar sb = (SeekBar) v;
-//                    int playPositionInMillisecconds = (mediaFileLengthInMilliseconds / 100) * sb.getProgress();
-//                    mPlayer.seekTo(playPositionInMillisecconds);
-//                }
-//                return false;
-//            });
-//
             seekBar.setOnSeekBarChangeListener(object : OnSeekBarChangeListener {
                 override fun onProgressChanged(seekBar: SeekBar, i: Int, b: Boolean) {}
                 override fun onStartTrackingTouch(seekBar: SeekBar) {}
@@ -234,7 +293,7 @@ class MainActivity : AppCompatActivity(), OnRefreshListener {
             mPlayer!!.setOnBufferingUpdateListener { mp1: MediaPlayer?, percent: Int ->
                 seekBar.secondaryProgress = percent
             }
-            mediaButton.setOnClickListener { v: View? ->
+            mediaButton.setOnClickListener {
                 mediaFileLengthInMilliseconds =
                     mPlayer!!.duration // gets the song length in milliseconds from URL
                 if (!mPlayer!!.isPlaying) {
@@ -244,7 +303,7 @@ class MainActivity : AppCompatActivity(), OnRefreshListener {
                     mPlayer!!.pause()
                     mediaButton.setImageResource(android.R.drawable.ic_media_play)
                 }
-                primarySeekBarProgressUpdater(view, mPlayer)
+//                primarySeekBarProgressUpdater(view, mPlayer)
             }
             mediaExitButton.setOnClickListener { v: View? ->
                 mPlayer!!.pause()
@@ -265,13 +324,13 @@ class MainActivity : AppCompatActivity(), OnRefreshListener {
      * @param view
      * @param mp
      */
-    @Synchronized
-    private fun primarySeekBarProgressUpdater(view: View, mp: MediaPlayer?) {
+    private suspend fun primarySeekBarProgressUpdater(view: View, mp: MediaPlayer?) {
         val seekBar: SeekBar = view.findViewById(R.id.seekBar)
         val mediaTime: TextView? = view.findViewById(R.id.mediaTime)
         val durationInMillis = mp!!.duration
         val curVolume = mp.currentPosition
         val HOUR = (60 * 60 * 1000).toLong()
+        runOnUiThread {
         if (mediaTime != null) {
             if (durationInMillis > HOUR) {
                 mediaTime.text = String.format(
@@ -288,11 +347,13 @@ class MainActivity : AppCompatActivity(), OnRefreshListener {
                 ) + " / " + String.format("%1\$tM:%1\$tS", Date(durationInMillis.toLong()))
             }
         }
-        seekBar.progress =
-            (mp.currentPosition.toFloat() / mediaFileLengthInMilliseconds * 100).toInt() // This math construction give a percentage of "was playing"/"song length"
+
+            seekBar.progress = (mp.currentPosition.toFloat() / mediaFileLengthInMilliseconds * 100).toInt() // This math construction give a percentage of "was playing"/"song length"
+        }
+
         if (mp.isPlaying) {
-            val notification = Runnable { primarySeekBarProgressUpdater(view, mp) }
-            handler.postDelayed(notification, 1000)
+            delay(1000)
+            primarySeekBarProgressUpdater(view, mp)
             Log.d("handler", "delay applied")
         }
     }
@@ -301,8 +362,7 @@ class MainActivity : AppCompatActivity(), OnRefreshListener {
         if (mPlayer != null) {
             mPlayer!!.stop()
         }
-        if (telawatList != null) telawatList!!.removeAllViews()
-        if (snackbar != null && snackbar!!.isShown) snackbar!!.dismiss()
+        findViewById<RecyclerView>(R.id.telawatRT).removeAllViews()
         val handler = Handler(mainLooper)
         handler.postDelayed({ swipeRefreshLayout.isRefreshing = false }, 500)
         currentRow = null
@@ -345,7 +405,7 @@ class MainActivity : AppCompatActivity(), OnRefreshListener {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == WRITE_EXTERNAL_STORAGE_CODE) {
             if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                startDownload((currentRow!!.getTag(ITEM_KEY) as EntriesItem).path, (currentRow!!.getTag(ITEM_KEY) as EntriesItem).title)
+                startDownload(currentRowModel!!.path, currentRowModel!!.title)
             } else {
                 Toast.makeText(this@MainActivity, R.string.permissionDeniedError, Toast.LENGTH_LONG)
                     .show()
@@ -354,8 +414,6 @@ class MainActivity : AppCompatActivity(), OnRefreshListener {
     }
 
     companion object {
-        private const val ITEM_KEY = R.string.app_name
-        private const val ROW_INDEX = R.string.permissionDeniedError
         private const val WRITE_EXTERNAL_STORAGE_CODE = 56
     }
 }
