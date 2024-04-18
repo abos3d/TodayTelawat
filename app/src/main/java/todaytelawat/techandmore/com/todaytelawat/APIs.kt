@@ -1,16 +1,15 @@
-package todaytelawat.techandmore.com.todaytelawat;
+package todaytelawat.techandmore.com.todaytelawat
 
-import retrofit2.Call;
-import retrofit2.http.Body;
-import retrofit2.http.POST;
-import todaytelawat.techandmore.com.todaytelawat.api_container.ResponseContainer;
-import todaytelawat.techandmore.com.todaytelawat.bodies.TelawatBody;
+import retrofit2.Call
+import retrofit2.http.Body
+import retrofit2.http.POST
+import todaytelawat.techandmore.com.todaytelawat.api_container.ResponseContainer
+import todaytelawat.techandmore.com.todaytelawat.bodies.TelawatBody
 
-public interface APIs {
-
+interface APIs {
     @POST("home")
-    Call<ResponseContainer> postTodayTelawat(@Body TelawatBody telawatBody);
+    fun postTodayTelawat(@Body telawatBody: TelawatBody?): Call<ResponseContainer>
 
-    @POST("home")
-    Call<ResponseContainer> getTodayTelawat();
+    @get:POST("home")
+    val todayTelawat: Call<ResponseContainer>
 }
