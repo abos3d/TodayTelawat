@@ -12,13 +12,6 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
 import android.os.Handler;
-import android.support.annotation.NonNull;
-import android.support.design.widget.Snackbar;
-import android.support.v4.app.ActivityCompat;
-import android.support.v4.content.ContextCompat;
-import android.support.v4.widget.SwipeRefreshLayout;
-import android.support.v7.app.AlertDialog;
-import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -28,6 +21,14 @@ import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.annotation.NonNull;
+import androidx.appcompat.app.AlertDialog;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
+
+import com.google.android.material.snackbar.Snackbar;
 import com.squareup.picasso.Picasso;
 
 import java.io.IOException;
@@ -47,8 +48,8 @@ import todaytelawat.techandmore.com.todaytelawat.bodies.TelawatBody;
 
 public class MainActivity extends AppCompatActivity implements SwipeRefreshLayout.OnRefreshListener {
 
-    private static final int ITEM_KEY = R.id.ifRoom;
-    private static final int ROW_INDEX = R.id.clip_vertical;
+    private static final int ITEM_KEY = R.string.app_name;
+    private static final int ROW_INDEX = R.string.permissionDeniedError;
     private static final int WRITE_EXTERNAL_STORAGE_CODE = 56;
     AlertDialog.Builder builder;
     private View view;
@@ -91,7 +92,7 @@ public class MainActivity extends AppCompatActivity implements SwipeRefreshLayou
 
 
         Retrofit retrofit = new Retrofit.Builder()
-                .baseUrl("http://api.tvquran.com/")
+                .baseUrl("https://api.tvquran.com/")
                 .client(client)
                 .addConverterFactory(GsonConverterFactory.create())
                 .build();
